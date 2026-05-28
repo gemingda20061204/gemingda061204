@@ -1,0 +1,133 @@
+const game = {
+    diskCount: 5,
+    pegs: [[], [], []],
+    moves: 0,
+    isAutoSolving: false,
+    selected: null
+};
+
+const colors = ['#FF6B6B', '#FFA07A', '#FFD700', '#98FB98', '#87CEFA', '#DDA0DD', '#F0E68C', '#9370DB'];
+const pegElements = document.querySelectorAll('.peg');
+
+function init() {
+    game.diskCount = +document.getElementById('diskCount').value;
+    game.pegs = [[], [], []];
+    game.moves = 0;
+    game.selected = null;
+    game.isAutoSolving = false;
+
+    for (let i = game.diskCount; i >= 1; i--) {
+        game.pegs[0].push(i);
+    }
+
+    updateUI();
+}
+
+function render() {
+    pegElements.forEach((peg, idx) => {
+        peg.innerHTML = '';
+        game.pegs[idx].forEach(size => {
+            const d = document.createElement('div');
+            d.className = 'disk';
+            d.dataset.size = size;
+            d.style.width = 60 + (size - 1) * (120 / (game.diskCount - 1)) + 'px';
+            d.style.backgroundColor = colors[size - 1];
+            d.onclick = () => pickDisk(idx, size);
+            peg.appendChild(d);
+        });
+    });
+}
+
+function pickDisk(pegIdx, size) {
+    if (game.isAutoSolving) return;
+    const top = game.pegs[pegIdx].at(-1);
+    if (top !== size) return;
+
+    if (game.selected === null) {
+        game.selected = pegIdx;
+        pegElements[pegIdx].classList.add('selected');
+    } else {
+        move(game.selected, pegIdx);
+        game.selected = null;
+        pegElements.forEach(p => p.classList.remove('selected'));
+    }
+}
+
+function move(from, to) {
+    const f = game.pegs[from];
+    const t = game.pegs[to];
+    const disk = f.at(-1);
+
+    if (t.length === 0 || disk < t.at(-1)) {
+        f.pop();
+        t.push(disk);
+        game.moves++;
+        updateUI();
+        checkWin();
+    } else {
+        showMsg('不能把大圆盘放在小圆盘上！', 'warning');
+        const topDisk = pegElements[from].querySelector('.disk:last-child');
+        topDisk.classList.add('warning');
+        setTimeout(() => topDisk.classList.remove('warning'), 500);
+    }
+}
+
+function updateUI() {
+    render();
+    document.getElementById('moveCount').textContent = game.moves;
+    document.getElementById('messageArea').className = '';
+}
+
+function showMsg(text, cls) {
+    const el = document.getElementById('messageArea');
+    el.textContent = text;
+    el.className = cls;
+}
+
+function checkWin() {
+    if (game.pegs[2].length === game.diskCount) {
+        showMsg(`🎉 恭喜通关！共用了 ${game.moves} 步`, 'victory');
+    }
+}
+
+async function autoSolve() {
+    game.isAutoSolving = true;
+    disableBtn(true);
+    showMsg('正在自动求解...', '');
+
+    async function hanoi(n, a, b, c) {
+        if (n === 0) return;
+        await hanoi(n - 1, a, c, b);
+        await new Promise(r => setTimeout(r, 600));
+        move(a, c);
+        await hanoi(n - 1, b, a, c);
+    }
+
+    await hanoi(game.diskCount, 0, 1, 2);
+    game.isAutoSolving = false;
+    disableBtn(false);
+}
+
+function disableBtn(dis) {
+    document.getElementById('resetBtn').disabled = dis;
+    document.getElementById('autoSolveBtn').disabled = dis;
+    document.getElementById('diskCount').disabled = dis;
+}
+
+document.getElementById('resetBtn').onclick = init;
+document.getElementById('autoSolveBtn').onclick = autoSolve;
+document.getElementById('diskCount').onchange = () => {
+    const v = +document.getElementById('diskCount').value;
+    if (v >= 3 && v <= 8) init();
+};
+
+pegElements.forEach((peg, i) => {
+    peg.onclick = e => {
+        if (e.target.classList.contains('disk') || game.selected === null || game.isAutoSolving) return;
+        move(game.selected, i);
+        game.selected = null;
+        pegElements.forEach(p => p.classList.remove('selected'));
+    };
+});
+
+init();
